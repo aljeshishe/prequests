@@ -4,15 +4,15 @@ from contextlib import contextmanager
 
 import requests as _requests
 from requests import ConnectTimeout
-from requests.exceptions import ProxyError, SSLError
-from urllib3.exceptions import ConnectTimeoutError, MaxRetryError
-
-from .singleton import SingletonMixin
-from .proxies import Proxies
+from requests.exceptions import ProxyError, SSLError, ConnectionError
+from .proxies import Proxies, NoProxiesLeftException
 
 log = logging.getLogger(__name__)
 
+
 class NeedToRetryException(Exception): pass
+
+class TooMuchTries(Exception): pass
 
 
 def _raise_if_need_retry(response, retry_on):
@@ -22,11 +22,7 @@ def _raise_if_need_retry(response, retry_on):
     # TODO implement here
     # if response.headers['content-type'] == 'application/json':
     #     response.json()  # avoiding incorrect json even if 200
-    codes = []
-    if isinstance(retry_on, int):
-        codes = [retry_on]
-    elif isinstance(retry_on, list):
-        codes = retry_on
+    codes = as_tuple(retry_on)
 
     if response.status_code in codes:
         raise NeedToRetryException('Need to retry request')
@@ -42,11 +38,19 @@ def save(self, proxy):
     return self
 
 
-_requests.Response.save = save
+def as_tuple(list_tuple_item_or_none):
+    if list_tuple_item_or_none is None:
+        return ()
+    if not isinstance(list_tuple_item_or_none, (list, tuple)):
+        return (list_tuple_item_or_none,)
 
+    return list_tuple_item_or_none
 
 @contextmanager
-def context(verbose=True, ignore_exceptions=None,  **kwargs):
+def context(verbose=True, ignore_exceptions=None, raise_exceptions=None, **kwargs):
+    ignore_exceptions = as_tuple(ignore_exceptions)
+    raise_exceptions = as_tuple(raise_exceptions)
+
     to_str = lambda d:  ' '.join(map(lambda i: f'{i[0]}={i[1]}', d.items()))
     kwargs_str = to_str(kwargs)
     if verbose:
@@ -56,29 +60,31 @@ def context(verbose=True, ignore_exceptions=None,  **kwargs):
         if verbose:
             log.info(f'Finished processing {to_str(kwargs)}')
     except Exception as e:
-        no_traceback = any([isinstance(e, ignore_exc) for ignore_exc in ignore_exceptions])
+        no_traceback = any([isinstance(e, exc) for exc in ignore_exceptions])
         exc_type = e.__class__.__name__ if no_traceback else ''
         log.exception(f'Exception {exc_type} while processing {to_str(kwargs)}', exc_info=not no_traceback)
+        if any([isinstance(e, exc) for exc in raise_exceptions]):
+            raise e
 
 
-def request(method, url, **kwargs):
+def request(method, url, retry_on=None, **kwargs):
     proxies = Proxies.instance()
     exception = None
     TRIES = 100
     for i in range(TRIES):
         with context(method=method, url=url, tries=TRIES, try_num=i,
-                     ignore_exceptions=(ConnectTimeout, ProxyError, NeedToRetryException, SSLError)) as ctx:
+                     ignore_exceptions=(ConnectTimeout, ProxyError, NeedToRetryException, SSLError, ConnectionError),
+                     raise_exceptions=NoProxiesLeftException) as ctx:
             with proxies.borrow() as proxy:
                 ctx['proxy'] = proxy.host_port
                 kwargs['proxies'] = dict(http=proxy.host_port, https=proxy.host_port)
                 kwargs['timeout'] = (10, 20)
                 kwargs['headers'] = {'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0'}
-                retry_on = kwargs.pop('retry_on', None)
-                response = _requests.request(method=method, url=url, **kwargs).save(proxy=proxy)
+                response = _requests.request(method=method, url=url, **kwargs)
                 ctx['status_code'] = response.status_code
                 _raise_if_need_retry(response=response, retry_on=retry_on)
                 return response
-    raise exception
+    raise TooMuchTries()
 
 
 def get(url, params=None, **kwargs):

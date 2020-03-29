@@ -8,12 +8,13 @@ import logging
 
 import requests
 
-from singleton import SingletonMixin
+from .singleton import SingletonMixin
 
 log = logging.getLogger(__name__)
 
 ALL_TYPES = dict.fromkeys(['HTTP', 'HTTPS', 'CONNECT:80', 'CONNECT:25', 'SOCKS4', 'SOCKS5'])
 
+class NoProxiesLeftException(Exception): pass
 
 class Request:
     def __init__(self, time, exception):
@@ -71,7 +72,7 @@ class Proxies(SingletonMixin):
         else:
             proxies = [Proxy.from_dict(d) for d in self._get_proxies() if 'HTTPS' in d['type']]
 
-        self.proxies = deque(proxies[:20])
+        self.proxies = deque(proxies[:300])
         self.bad_proxies = deque()
         if not self.proxies:
             raise Exception('No prosies received from proxybroker')
@@ -92,16 +93,18 @@ class Proxies(SingletonMixin):
             self.put_back(proxy=proxy)
 
     def get(self):
+        if not self.proxies:
+            raise NoProxiesLeftException()
         proxy = self.proxies.pop()
         log.info('Got proxy {}'.format(proxy))
         return proxy
 
     def put_back(self, proxy):
-        if proxy.errors > 3:
+        if proxy.errors >= 3:
             self.bad_proxies.appendleft(proxy)
         else:
             self.proxies.appendleft(proxy)
-        log.info('Putting back proxy {} bad:{} all:{}'.format(proxy, len(self.proxies), len(self.bad_proxies)))
+        log.info(f'Putting back proxy {proxy} bad:{len(self.bad_proxies)} all:{len(self.proxies)}')
 
 
 if __name__ == '__main__':
