@@ -27,3 +27,13 @@ __copyright__ = 'Copyright 2020 aljeshishe'
 
 from .prequests import Proxies, request, get, head, post, patch, put, delete, options  # noqa
 
+from requests import utils
+from requests import packages
+from requests.models import Request, Response, PreparedRequest
+from requests.sessions import session, Session
+from requests.status_codes import codes
+from requests.exceptions import (
+    RequestException, Timeout, URLRequired,
+    TooManyRedirects, HTTPError, ConnectionError,
+    FileModeWarning, ConnectTimeout, ReadTimeout
+)
