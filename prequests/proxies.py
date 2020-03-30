@@ -102,7 +102,7 @@ class Proxies(SingletonMixin):
     def get(self):
         with self.lock:
             if len(self.proxies) < 10:
-                log.warn(f'good: {len(self.proxies)} < 10 >, retreiving more')
+                log.warn(f'good: {len(self.proxies)} < 10, retreiving more')
                 self.proxies += self._prepare_proxies()
         proxy = self.proxies.pop()
         log.info('Got proxy {}'.format(proxy))
