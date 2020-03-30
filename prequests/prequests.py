@@ -4,7 +4,7 @@ from contextlib import contextmanager
 
 import requests as _requests
 from requests import ConnectTimeout
-from requests.exceptions import ProxyError, SSLError, ConnectionError
+from requests.exceptions import ProxyError, SSLError, ConnectionError, ReadTimeout
 from .proxies import Proxies, NoProxiesLeftException
 
 log = logging.getLogger(__name__)
@@ -73,7 +73,8 @@ def request(method, url, retry_on=None, **kwargs):
     TRIES = 100
     for i in range(TRIES):
         with context(method=method, url=url, tries=TRIES, try_num=i,
-                     ignore_exceptions=(ConnectTimeout, ProxyError, NeedToRetryException, SSLError, ConnectionError),
+                     ignore_exceptions=(ConnectTimeout, ProxyError, NeedToRetryException, SSLError,
+                                        ConnectionError, ReadTimeout),
                      raise_exceptions=NoProxiesLeftException) as ctx:
             with proxies.borrow() as proxy:
                 ctx['proxy'] = proxy.host_port
