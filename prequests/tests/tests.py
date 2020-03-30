@@ -7,6 +7,8 @@ from threading import Thread
 import prequests
 import logging
 
+from prequests import content_has
+
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s.%(msecs)03d|%(levelname)-4.4s|%(thread)-6.6s|%(funcName)-10.10s|%(message)s',
                     handlers=[logging.StreamHandler(),
@@ -18,10 +20,10 @@ def f():
         try:
             # prequests.Proxies.instance(proxies=['39.137.95.70:80'])
             resp = prequests.get('https://www.avito.ru/sankt-peterburg/detskaya_odezhda_i_obuv/shapki_trikotazhnye_velyur_mei_molo_polarn_lindex_1917349145',
-                                 retry_on=403)
+                                 retry_on=(content_has('временно ограничен'), content_has('Доступ временно заблокирован')))
         except Exception as e:
             logging.exception('Exception while getting avito.ru')
 
-threads = [Thread(target=f) for i in range(2)]
+threads = [Thread(target=f) for i in range(1)]
 [t.start() for t in threads]
 time.sleep(10000)

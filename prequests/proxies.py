@@ -88,7 +88,7 @@ class Proxies(SingletonMixin):
             with open('proxies_{}.json'.format(datetime.now().strftime('%y_%m_%d__%H_%M_%S')), 'w') as fp:
                 json.dump(fp=fp, obj=proxies, indent=2)
 
-        return deque([Proxy.from_dict(d) for d in proxies if {'type': 'HTTPS', 'level': ''} in d['types']][:20])
+        return deque([Proxy.from_dict(d) for d in proxies if {'type': 'HTTPS', 'level': ''} in d['types']])
 
     @contextmanager
     def borrow(self):
