@@ -30,17 +30,16 @@ class Request:
 class Proxy:
     @staticmethod
     def from_dict(d):
-        return Proxy(host=d['host'], port=d['port'], types=d['type'])
+        return Proxy(host=d['host'], port=d['port'])
 
     @staticmethod
     def from_string(s):
         host, _, port = s.partition(':')
-        return Proxy(host=host, port=port if port else '80', types=ALL_TYPES)
+        return Proxy(host=host, port=port if port else '80')
 
-    def __init__(self, host, port, types):
+    def __init__(self, host, port):
         self.host = host
         self.port = port
-        self.types = types
         self.log = []
         self.errors = 0
         self.requests = 0
@@ -70,12 +69,12 @@ class Proxies(SingletonMixin):
         if proxies:
             proxies = [Proxy.from_string(proxy_str) for proxy_str in proxies]
         else:
-            proxies = [Proxy.from_dict(d) for d in self._get_proxies() if 'HTTPS' in d['type']]
+            proxies = [Proxy.from_dict(d) for d in self._get_proxies() if {'type': 'HTTPS', 'level': ''} in d['types']]
 
         self.proxies = deque(proxies[:300])
         self.bad_proxies = deque()
         if not self.proxies:
-            raise Exception('No prosies received from proxybroker')
+            raise Exception('No proxies received from proxybroker')
 
     def _get_proxies(self):
         proxies = requests.get('http://proxybroker.grachev.space/').json()
