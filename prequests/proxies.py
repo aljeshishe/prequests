@@ -42,6 +42,7 @@ class Proxy:
         self.port = port
         self.log = []
         self.errors = 0
+        self.seq_errors = 0
         self.requests = 0
 
     def __enter__(self):
@@ -52,9 +53,12 @@ class Proxy:
         self.log.append(Request(time=time.time() - self.start_time, exception=exc_val))
         if exc_type:
             self.errors += 1
+            self.seq_errors += 1
+        else:
+            self.seq_errors = 0
 
     def __str__(self):
-        return f'{self.host_port} req:{self.requests} err:{self.errors}'
+        return f'{self.host_port} req:{self.requests} err:{self.errors} seq_err:{self.seq_errors}'
 
     __repr__ = __str__
 
@@ -71,7 +75,7 @@ class Proxies(SingletonMixin):
         else:
             proxies = [Proxy.from_dict(d) for d in self._get_proxies() if {'type': 'HTTPS', 'level': ''} in d['types']]
 
-        self.proxies = deque(proxies[:300])
+        self.proxies = deque(proxies)
         self.bad_proxies = deque()
         if not self.proxies:
             raise Exception('No proxies received from proxybroker')
@@ -99,7 +103,7 @@ class Proxies(SingletonMixin):
         return proxy
 
     def put_back(self, proxy):
-        if proxy.errors >= 3:
+        if proxy.seq_errors >= 4:
             self.bad_proxies.appendleft(proxy)
         else:
             self.proxies.appendleft(proxy)
