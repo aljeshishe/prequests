@@ -25,7 +25,7 @@ __license__ = 'Apache License, Version 2.0'
 __copyright__ = 'Copyright 2020 aljeshishe'
 
 
-from .prequests import Proxies, request, get, head, post, patch, put, delete, options  # noqa
+from .prequests import Proxies, request, get, head, post, patch, put, delete, options, content_has  # noqa
 
 from requests import utils
 from requests import packages

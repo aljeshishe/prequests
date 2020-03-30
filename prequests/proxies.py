@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from pprint import pprint
 import logging
+from threading import Lock
 
 import requests
 
@@ -70,21 +71,24 @@ class Proxy:
 class Proxies(SingletonMixin):
 
     def __init__(self, proxies=None):
-        if proxies:
-            proxies = [Proxy.from_string(proxy_str) for proxy_str in proxies]
-        else:
-            proxies = [Proxy.from_dict(d) for d in self._get_proxies() if {'type': 'HTTPS', 'level': ''} in d['types']]
-
-        self.proxies = deque(proxies)
+        self.lock = Lock()
+        self.proxies = self._prepare_proxies(proxies)
         self.bad_proxies = deque()
+        self.used_proxies = 0
+        self.max_used_proxies = 0
         if not self.proxies:
             raise Exception('No proxies received from proxybroker')
 
-    def _get_proxies(self):
-        proxies = requests.get('http://proxybroker.grachev.space/').json()
-        with open('proxies_{}.json'.format(datetime.now().strftime('%y_%m_%d__%H_%M_%S')), 'w') as fp:
-            json.dump(fp=fp, obj=proxies, indent=2)
-        return proxies
+    @staticmethod
+    def _prepare_proxies(proxies=None):
+        if proxies:
+            proxies = [Proxy.from_string(proxy_str) for proxy_str in proxies]
+        else:
+            proxies = requests.get('http://proxybroker.grachev.space/').json()
+            with open('proxies_{}.json'.format(datetime.now().strftime('%y_%m_%d__%H_%M_%S')), 'w') as fp:
+                json.dump(fp=fp, obj=proxies, indent=2)
+
+        return deque([Proxy.from_dict(d) for d in proxies if {'type': 'HTTPS', 'level': ''} in d['types']][:20])
 
     @contextmanager
     def borrow(self):
@@ -96,10 +100,14 @@ class Proxies(SingletonMixin):
             self.put_back(proxy=proxy)
 
     def get(self):
-        if not self.proxies:
-            raise NoProxiesLeftException()
+        with self.lock:
+            if len(self.proxies) < 10:
+                log.warn(f'good: {len(self.proxies)} < 10 >, retreiving more')
+                self.proxies += self._prepare_proxies()
         proxy = self.proxies.pop()
         log.info('Got proxy {}'.format(proxy))
+        self.used_proxies += 1
+        self.max_used_proxies = max(self.used_proxies, self.max_used_proxies)
         return proxy
 
     def put_back(self, proxy):
@@ -107,7 +115,8 @@ class Proxies(SingletonMixin):
             self.bad_proxies.appendleft(proxy)
         else:
             self.proxies.appendleft(proxy)
-        log.info(f'Putting back proxy {proxy} bad:{len(self.bad_proxies)} all:{len(self.proxies)}')
+        self.used_proxies -= 1
+        log.info(f'Putting back proxy {proxy} bad:{len(self.bad_proxies)} good:{len(self.proxies)} used:{self.used_proxies}')
 
 
 if __name__ == '__main__':

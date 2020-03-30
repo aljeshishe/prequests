@@ -1,6 +1,7 @@
 import logging
 import string
 from contextlib import contextmanager
+from functools import partial
 
 import requests as _requests
 from requests import ConnectTimeout
@@ -12,7 +13,15 @@ log = logging.getLogger(__name__)
 
 class NeedToRetryException(Exception): pass
 
+
 class TooMuchTries(Exception): pass
+
+
+def _content_has(s, response):
+    return s in response.text
+
+
+content_has = lambda s: partial(_content_has, s)
 
 
 def _raise_if_need_retry(response, retry_on):
@@ -22,10 +31,13 @@ def _raise_if_need_retry(response, retry_on):
     # TODO implement here
     # if response.headers['content-type'] == 'application/json':
     #     response.json()  # avoiding incorrect json even if 200
-    codes = as_tuple(retry_on)
-
-    if response.status_code in codes:
-        raise NeedToRetryException('Need to retry request')
+    checkers = as_tuple(retry_on)
+    exc = NeedToRetryException('Need to retry request')
+    for checker in checkers:
+        if isinstance(checker, int) and response.status_code == checker:
+            raise exc
+        if callable(checker) and checker(response):
+            raise exc
 
 
 def save(self, proxy):
