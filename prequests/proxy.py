@@ -1,8 +1,12 @@
 import json
+import logging
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from prequests.utils import context
+
+
+log = logging.getLogger(__name__)
 
 
 class Request:
@@ -19,41 +23,52 @@ class Request:
 class Proxy:
     @staticmethod
     def from_dict(d):
-        return Proxy(host=d['host'], port=d['port'])
+        return Proxy(host=d['host'], port=d['port'], throttling_interval_secs=d['throttling_interval_secs'])
 
     @staticmethod
     def from_string(s):
         host, _, port = s.partition(':')
         return Proxy(host=host, port=port if port else '80')
 
-    def __init__(self, host, port):
+    def __init__(self, host, port, throttling_interval_secs=0):
         self.host = host
         self.port = port
+        self.throttling_interval_secs = throttling_interval_secs
         self.log = []
         self.errors = 0
         self.seq_errors = 0
         self.requests = 0
+        self.next_datetm = None
+        self.interval = 0
+
+    def as_tuple(self):
+        self.interval = self.throttling_interval_secs * self.seq_errors
+        if self.requests:
+            self.interval += self.throttling_interval_secs
+        self.next_datetm = datetime.now() + timedelta(seconds=self.interval)
+        log.info(f'{self} will be used at {self.next_datetm} after {self.interval} seconds')
+        return self.next_datetm, self
 
     def __enter__(self):
         self.start_time = time.time()
         self.requests += 1
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        time_left = time.time() - self.start_time
-        self.log.append(Request(time=time_left, exception=exc_val))
+        elapsed_time = time.time() - self.start_time
+        self.log.append(Request(time=elapsed_time, exception=exc_val))
         if exc_type:
             self.errors += 1
             self.seq_errors += 1
         else:
             self.seq_errors = 0
-        self.dump(exc=exc_type, time_left=time_left)
+        self.dump(exc=exc_type, elapsed_time=elapsed_time)
 
-    def dump(self, exc, time_left):
+    def dump(self, exc, elapsed_time):
         with context(verbose=False):
             with open('prequests_stats.json', 'a') as fp:
                 data = dict(proxy=self.host_port, exc=str(exc), datetm=str(datetime.now()),
                             requests=self.requests, errors=self.errors, seq_errors=self.seq_errors,
-                            time_left=time_left)
+                            elapsed_time=elapsed_time, interval=self.interval)
                 fp.write(f'{json.dumps(data)}\n')
 
     def __str__(self):
