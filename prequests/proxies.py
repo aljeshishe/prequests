@@ -8,6 +8,8 @@ import logging
 from threading import Lock
 
 import requests
+from prequests.proxy import Proxy
+from prequests.utils import context
 
 from .singleton import SingletonMixin
 
@@ -16,56 +18,6 @@ log = logging.getLogger(__name__)
 ALL_TYPES = dict.fromkeys(['HTTP', 'HTTPS', 'CONNECT:80', 'CONNECT:25', 'SOCKS4', 'SOCKS5'])
 
 class NoProxiesLeftException(Exception): pass
-
-class Request:
-    def __init__(self, time, exception):
-        self.time = time
-        self.exception = exception
-
-    def __str__(self):
-        return f'{self.time}: {self.exception}'
-
-    __repr__ = __str__
-
-
-class Proxy:
-    @staticmethod
-    def from_dict(d):
-        return Proxy(host=d['host'], port=d['port'])
-
-    @staticmethod
-    def from_string(s):
-        host, _, port = s.partition(':')
-        return Proxy(host=host, port=port if port else '80')
-
-    def __init__(self, host, port):
-        self.host = host
-        self.port = port
-        self.log = []
-        self.errors = 0
-        self.seq_errors = 0
-        self.requests = 0
-
-    def __enter__(self):
-        self.start_time = time.time()
-        self.requests += 1
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.log.append(Request(time=time.time() - self.start_time, exception=exc_val))
-        if exc_type:
-            self.errors += 1
-            self.seq_errors += 1
-        else:
-            self.seq_errors = 0
-
-    def __str__(self):
-        return f'{self.host_port} req:{self.requests} err:{self.errors} seq_err:{self.seq_errors}'
-
-    __repr__ = __str__
-
-    @property
-    def host_port(self):
-        return f'{self.host}:{self.port}'
 
 
 class Proxies(SingletonMixin):
