@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import time
 from datetime import datetime, timedelta
 
@@ -23,17 +24,18 @@ class Request:
 class Proxy:
     @staticmethod
     def from_dict(d):
-        return Proxy(host=d['host'], port=d['port'], throttling_interval_secs=d['throttling_interval_secs'])
+        return Proxy(host=d['host'], port=d['port'])
 
     @staticmethod
     def from_string(s):
         host, _, port = s.partition(':')
         return Proxy(host=host, port=port if port else '80')
 
-    def __init__(self, host, port, throttling_interval_secs=0):
+    def __init__(self, host, port, ):
+        self.throttling_interval_secs = 1
+        self.stats_fp = open(os.devnull, 'w')
         self.host = host
         self.port = port
-        self.throttling_interval_secs = throttling_interval_secs
         self.log = []
         self.errors = 0
         self.seq_errors = 0
@@ -65,11 +67,13 @@ class Proxy:
 
     def dump(self, exc, elapsed_time):
         with context(verbose=False):
-            with open('prequests_stats.json', 'a') as fp:
-                data = dict(proxy=self.host_port, exc=str(exc), datetm=str(datetime.now()),
-                            requests=self.requests, errors=self.errors, seq_errors=self.seq_errors,
-                            elapsed_time=elapsed_time, interval=self.interval)
-                fp.write(f'{json.dumps(data)}\n')
+            data = dict(proxy=self.host_port,
+                        exc='' if exc else exc.__name__,
+                        datetm=str(datetime.now()),
+                        requests=self.requests, errors=self.errors, seq_errors=self.seq_errors,
+                        elapsed_time=f'{elapsed_time:.3f}', interval=self.interval)
+            self.stats_fp.write(f'{json.dumps(data)}\n')
+            self.stats_fp.flush()
 
     def __str__(self):
         return f'{self.host_port} req:{self.requests} err:{self.errors} seq_err:{self.seq_errors}'
