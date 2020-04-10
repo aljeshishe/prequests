@@ -23,7 +23,7 @@ class NoProxiesLeftException(Exception): pass
 
 class Proxies(SingletonMixin):
 
-    def __init__(self, proxies=None, throttling_interval_secs=60):
+    def __init__(self, proxies=None, throttling_interval_secs=1):
         self.throttling_interval_secs = throttling_interval_secs
         self.lock = Lock()
         self.proxies = PriorityQueue()
