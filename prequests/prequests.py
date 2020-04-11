@@ -61,9 +61,9 @@ def request(method, url, retry_on=None, **kwargs):
                      raise_exceptions=NoProxiesLeftException) as ctx:
             with proxies.borrow() as proxy:
                 ctx['proxy'] = proxy.host_port
-                kwargs.setdefault('proxies', dict(https=proxy.host_port))
-                kwargs.setdefault('timeout', (10, 20))
-                kwargs.setdefault('headers', {'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0'})
+                kwargs['proxies'] = dict(https=proxy.host_port)
+                kwargs['timeout'] = (10, 20)
+                kwargs['headers'] = {'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0'}
                 response = _requests.request(method=method, url=url, **kwargs)
                 ctx['status_code'] = response.status_code
                 _raise_if_need_retry(response=response, retry_on=retry_on)

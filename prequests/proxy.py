@@ -68,7 +68,7 @@ class Proxy:
     def dump(self, exc, elapsed_time):
         with context(verbose=False):
             data = dict(proxy=self.host_port,
-                        exc='' if exc else exc.__name__,
+                        exc=exc.__name__ if exc else '',
                         datetm=str(datetime.now()),
                         requests=self.requests, errors=self.errors, seq_errors=self.seq_errors,
                         elapsed_time=f'{elapsed_time:.3f}', interval=self.interval)
