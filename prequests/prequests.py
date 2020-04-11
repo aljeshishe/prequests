@@ -5,7 +5,7 @@ from functools import partial
 
 import requests as _requests
 from requests import ConnectTimeout
-from requests.exceptions import ProxyError, SSLError, ConnectionError, ReadTimeout
+from requests.exceptions import ProxyError, SSLError, ConnectionError, ReadTimeout, ChunkedEncodingError
 from .proxies import Proxies, NoProxiesLeftException
 from .utils import context, as_tuple
 
@@ -57,7 +57,7 @@ def request(method, url, retry_on=None, **kwargs):
     for i in range(TRIES):
         with context(method=method, url=url, tries=TRIES, try_num=i,
                      ignore_exceptions=(ConnectTimeout, ProxyError, NeedToRetryException, SSLError,
-                                        ConnectionError, ReadTimeout),
+                                        ConnectionError, ReadTimeout, ChunkedEncodingError),
                      raise_exceptions=NoProxiesLeftException) as ctx:
             with proxies.borrow() as proxy:
                 ctx['proxy'] = proxy.host_port
